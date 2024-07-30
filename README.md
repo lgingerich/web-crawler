@@ -55,3 +55,21 @@ poetry run ruff .
 ```
 
 Ruff will analyze your code for potential errors and style issues.
+
+
+# Notes / To Do
+
+send waiting url's to kafka producer
+    idea (untested):
+        have max XX url's waiting in the queue from the producer
+        once url's get consumed, backfill to keep the queue full
+
+kafka queue feeds consumer 
+
+consumer = scraper
+
+can't push data through kafka so need to save data on the consumer/scraper side
+
+scalable version of this consumer/scraper should be k8s with multiple pods
+
+for repeated scraping, store a hash of robots.txt and the page content for each url
