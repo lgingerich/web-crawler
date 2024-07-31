@@ -1,0 +1,226 @@
+[
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:31:03.687024"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:31:04.129771"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:31:04.312017"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:38:19.986283"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:38:21.748260"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:38:22.626783"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:38:38.667498"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:38:40.045502"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T18:38:40.594372"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:42:48.758805"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:42:50.163241"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:42:50.681602"
+    },
+    {
+        "url": "https://google.com",
+        "title": null,
+        "filename": "scraped_data/google_com.html",
+        "success": false,
+        "lastCrawlTime": "2024-07-30T20:53:31.573394"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": null,
+        "filename": "scraped_data/amazon_com.html",
+        "success": false,
+        "lastCrawlTime": "2024-07-30T20:53:31.879480"
+    },
+    {
+        "url": "https://example.com",
+        "title": null,
+        "filename": "scraped_data/example_com.html",
+        "success": false,
+        "lastCrawlTime": "2024-07-30T20:53:32.182637"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:56:54.361024"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:56:55.883741"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:56:56.416699"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:57:16.291932"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:57:17.204225"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T20:57:17.714860"
+    },
+    {
+        "url": "https://google.com",
+        "title": null,
+        "filename": "scraped_data/google_com.html",
+        "success": false,
+        "lastCrawlTime": "2024-07-30T21:05:45.331695"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": null,
+        "filename": "scraped_data/amazon_com.html",
+        "success": false,
+        "lastCrawlTime": "2024-07-30T21:06:15.750845"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:12:47.060540"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:12:48.844867"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:12:49.364867"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:27:34.855605"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:27:35.706015"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:27:38.247532"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:31:06.799690"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:31:07.666584"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-30T21:31:08.783266"
+    }
+]
