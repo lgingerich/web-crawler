@@ -264,5 +264,26 @@
         "filename": "scraped_data/google_com.html",
         "success": true,
         "lastCrawlTime": "2024-07-31T19:38:31.188028"
+    },
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-31T20:26:25.556390"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-31T20:26:27.297965"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-07-31T20:26:27.448368"
     }
 ]

@@ -7,12 +7,14 @@ from urllib.parse import urlparse
 import aiofiles
 from typing import Tuple, Dict, Any
 import logging
+from kafka_producer import ScraperProducer
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(module)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class Scraper:
     def __init__(self, output_dir: str = "scraped_data", headless: bool = True, slow_mo: int = 0):
+        self.producer = ScraperProducer()
         self.output_dir = output_dir
         self.headless = headless
         self.slow_mo = slow_mo
@@ -99,17 +101,59 @@ class Scraper:
                 try:
                     await self.save_html(content, filepath)
                     logger.info(f"Saved HTML content for {url} to {filepath}")
+                    
+                    await self.save_metadata(url, title, filepath, True)
+                    logger.info(f"Successfully processed {url}")
+                    
+                    # Send successful scrape data to Kafka
+                    kafka_data = {
+                        "url": url,
+                        "title": title,
+                        "filepath": filepath,
+                        "success": True,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    self.producer.send_data('scraped_data', kafka_data)
+                    logger.info(f"Sent successful scrape data to Kafka for {url}")
+                    
                 except IOError as e:
                     logger.error(f"Failed to save HTML for {url}: {e}")
                     await self.save_metadata(url, title, filepath, False)
-                    return
-                
-                await self.save_metadata(url, title, filepath, True)
-                logger.info(f"Successfully processed {url}")
+                    
+                    # Send failed scrape data to Kafka
+                    kafka_data = {
+                        "url": url,
+                        "success": False,
+                        "error": str(e),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    self.producer.send_data('scraped_data', kafka_data)
+                    logger.info(f"Sent failed scrape data to Kafka for {url}")
+                    
             else:
                 logger.warning(f"No content retrieved for {url}")
                 await self.save_metadata(url, None, filepath, False)
+                
+                # Send no content data to Kafka
+                kafka_data = {
+                    "url": url,
+                    "success": False,
+                    "error": "No content retrieved",
+                    "timestamp": datetime.now().isoformat()
+                }
+                self.producer.send_data('scraped_data', kafka_data)
+                logger.info(f"Sent no content data to Kafka for {url}")
         
         except Exception as e:
             logger.error(f"Unexpected error processing {url}: {e}")
             await self.save_metadata(url, None, filepath, False)
+            
+            # Send error data to Kafka
+            kafka_data = {
+                "url": url,
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+            self.producer.send_data('scraped_data', kafka_data)
+            logger.info(f"Sent error data to Kafka for {url}")
