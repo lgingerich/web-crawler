@@ -4,13 +4,16 @@ import os
 from scraper import Scraper
 from urllib.parse import urlparse
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(module)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(module)s - %(message)s", level=logging.INFO
+)
 logger = logging.getLogger(__name__)
+
 
 async def process(scraper, url):
     try:
         # Ensure URL has the scheme
-        if not url.startswith(('http://', 'https://')):
+        if not url.startswith(("http://", "https://")):
             url = f"https://{url}"
 
         ########### Probably better way to handle this ############
@@ -32,7 +35,7 @@ async def process(scraper, url):
                 logger.error(f"Failed to save HTML for {url}: {e}")
                 await scraper.save_metadata(url, title, None, filepath, False)
                 return
-            
+
             await scraper.save_metadata(url, title, hashed_content, filepath, True)
             logger.info(f"Successfully processed {url}")
         else:
@@ -45,19 +48,13 @@ async def process(scraper, url):
 
 
 async def main(scraper: Scraper, urls: list):
-    
     tasks = [process(scraper, url) for url in urls]
     await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
     # Inputs
-    urls = [
-        'google.com',
-        'amazon.com',
-        'example.com',
-        'dell.com'
-    ]
+    urls = ["google.com", "amazon.com", "example.com", "dell.com"]
     headless = True
     slow_mo = 0  # in milliseconds
     metadata_file = os.path.join("scraped_data", "metadata.json")

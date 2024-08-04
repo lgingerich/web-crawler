@@ -1,13 +1,18 @@
 from confluent_kafka import Consumer, KafkaError
 import json
 
+
 class ScraperConsumer:
-    def __init__(self, topics, bootstrap_servers='localhost:9092', group_id='scraper_group'):
-        self.consumer = Consumer({
-            'bootstrap.servers': bootstrap_servers,
-            'group.id': group_id,
-            'auto.offset.reset': 'earliest'
-        })
+    def __init__(
+        self, topics, bootstrap_servers="localhost:9092", group_id="scraper_group"
+    ):
+        self.consumer = Consumer(
+            {
+                "bootstrap.servers": bootstrap_servers,
+                "group.id": group_id,
+                "auto.offset.reset": "earliest",
+            }
+        )
         self.consumer.subscribe(topics)
 
     def consume(self):
@@ -21,7 +26,7 @@ class ScraperConsumer:
                 else:
                     print(f"Consumer error: {msg.error()}")
                     break
-            yield json.loads(msg.value().decode('utf-8'))
+            yield json.loads(msg.value().decode("utf-8"))
 
     def close(self):
         self.consumer.close()
