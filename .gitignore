@@ -173,5 +173,6 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# Exclude all .log files
+# Exclude all html and json files
 *.html
+*.json
