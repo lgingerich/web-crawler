@@ -73,3 +73,9 @@ can't push data through kafka so need to save data on the consumer/scraper side
 scalable version of this consumer/scraper should be k8s with multiple pods
 
 for repeated scraping, store a hash of robots.txt and the page content for each url
+
+add more metadata for each url
+    successfulCrawls
+    failedCrawls
+    firstCrawlTime
+    

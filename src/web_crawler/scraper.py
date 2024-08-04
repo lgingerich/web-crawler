@@ -1,41 +1,45 @@
-import asyncio
-import json
-import os
-from datetime import datetime
-from playwright.async_api import async_playwright
-from urllib.parse import urlparse
 import aiofiles
-from typing import Tuple, Dict, Any
+from datetime import datetime
+import hashlib
+import json
 import logging
-from kafka_producer import ScraperProducer
+import os
+from playwright.async_api import async_playwright
+from typing import Tuple, Dict, Any
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(module)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class Scraper:
-    def __init__(self, output_dir: str = "scraped_data", headless: bool = True, slow_mo: int = 0):
-        self.producer = ScraperProducer()
-        self.output_dir = output_dir
+    def __init__(self, headless: bool = True, slow_mo: int = 0, metadata_file: str = "scraped_data/metadata.json"):
         self.headless = headless
         self.slow_mo = slow_mo
-        self.metadata_file = os.path.join(output_dir, "metadata.json")
-        os.makedirs(output_dir, exist_ok=True)
+        self.metadata_file = metadata_file
+        os.makedirs(os.path.dirname(metadata_file), exist_ok=True) # check if directory already exists
+
 
     async def scrape_url(self, url: str) -> Tuple[str, str]:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless, slow_mo=self.slow_mo)
             page = await browser.new_page()
-            
+
             try:
                 await page.goto(url)
                 title = await page.title()
-                content = await page.content()  
+                # content = await page.content() # Get full page content
+                
+                content = await page.locator("body").inner_text() # Get content of the body tag
                 return title, content
             except Exception as e:
                 logger.error(f"Error scraping {url}: {str(e)}")
                 return None, None
             finally:
                 await browser.close()
+
+
+    def hash_str(self, content: str) -> str:
+        return hashlib.blake2b(content.encode('utf-8')).hexdigest()
+
 
     async def save_html(self, content: str, filename: str) -> None:
         try:
@@ -49,24 +53,39 @@ class Scraper:
             logger.error(f"Unexpected error while saving HTML to {filename}: {e}")
             raise
 
-    async def save_metadata(self, url: str, title: str, filename: str, success: bool) -> None:
+
+    async def save_metadata(self, url: str, title: str, content_hash: str, filename: str, success: bool) -> None:
         metadata: Dict[str, Any] = {
             "url": url,
             "title": title,
+            "contentHash": content_hash,
             "filename": filename,
             "success": success,
             "lastCrawlTime": datetime.now().isoformat()
         }
-        
+
         try:
-            async with aiofiles.open(self.metadata_file, 'r+') as f:
+            # Read existing data
+            async with aiofiles.open(self.metadata_file, 'r') as f:
                 content = await f.read()
                 data = json.loads(content) if content else []
+
+            # Update or append the new metadata
+            updated = False
+            for item in data:
+                if item['url'] == url:
+                    item.update(metadata)
+                    updated = True
+                    break
+            
+            if not updated:
                 data.append(metadata)
-                await f.seek(0)
-                await f.truncate()
+
+            # Write the updated data back to the file
+            async with aiofiles.open(self.metadata_file, 'w') as f:
                 await f.write(json.dumps(data, indent=4))
-            logger.info(f"Metadata saved successfully for {url}")
+
+            logger.info(f"Metadata {'updated' if updated else 'saved'} for {url}")
         except FileNotFoundError:
             async with aiofiles.open(self.metadata_file, 'w') as f:
                 await f.write(json.dumps([metadata], indent=4))
@@ -81,79 +100,3 @@ class Scraper:
         except Exception as e:
             logger.error(f"Unexpected error when saving metadata for {url}: {e}")
             raise
-
-    async def process_url(self, url: str) -> None:
-        try:
-            # Ensure URL has a scheme
-            if not url.startswith(('http://', 'https://')):
-                url = f"https://{url}"
-            
-            # Prepare filename and filepath
-            parsed_url = urlparse(url)
-            filename = f"{parsed_url.netloc.replace('.', '_')}.html"
-            filepath = os.path.join(self.output_dir, filename)
-            
-            # Scrape URL
-            title, content = await self.scrape_url(url)
-            
-            # Save content and metadata
-            if content:
-                try:
-                    await self.save_html(content, filepath)
-                    logger.info(f"Saved HTML content for {url} to {filepath}")
-                    
-                    await self.save_metadata(url, title, filepath, True)
-                    logger.info(f"Successfully processed {url}")
-                    
-                    # Send successful scrape data to Kafka
-                    kafka_data = {
-                        "url": url,
-                        "title": title,
-                        "filepath": filepath,
-                        "success": True,
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    self.producer.send_data('scraped_data', kafka_data)
-                    logger.info(f"Sent successful scrape data to Kafka for {url}")
-                    
-                except IOError as e:
-                    logger.error(f"Failed to save HTML for {url}: {e}")
-                    await self.save_metadata(url, title, filepath, False)
-                    
-                    # Send failed scrape data to Kafka
-                    kafka_data = {
-                        "url": url,
-                        "success": False,
-                        "error": str(e),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    self.producer.send_data('scraped_data', kafka_data)
-                    logger.info(f"Sent failed scrape data to Kafka for {url}")
-                    
-            else:
-                logger.warning(f"No content retrieved for {url}")
-                await self.save_metadata(url, None, filepath, False)
-                
-                # Send no content data to Kafka
-                kafka_data = {
-                    "url": url,
-                    "success": False,
-                    "error": "No content retrieved",
-                    "timestamp": datetime.now().isoformat()
-                }
-                self.producer.send_data('scraped_data', kafka_data)
-                logger.info(f"Sent no content data to Kafka for {url}")
-        
-        except Exception as e:
-            logger.error(f"Unexpected error processing {url}: {e}")
-            await self.save_metadata(url, None, filepath, False)
-            
-            # Send error data to Kafka
-            kafka_data = {
-                "url": url,
-                "success": False,
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            }
-            self.producer.send_data('scraped_data', kafka_data)
-            logger.info(f"Sent error data to Kafka for {url}")

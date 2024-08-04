@@ -1,0 +1,34 @@
+[
+    {
+        "url": "https://example.com",
+        "title": "Example Domain",
+        "contentHash": "0ec4999bc50fc88b94b1a184deb1bd1f5ebab6018fbeaa3b6ce82b2a37fb03b03600726c994ebb07fc6b7f3ad5d817049365bfaa572b2a13cfb07cf88406591a",
+        "filename": "scraped_data/example_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-08-04T17:14:16.731512"
+    },
+    {
+        "url": "https://amazon.com",
+        "title": "Amazon.com. Spend less. Smile more.",
+        "contentHash": "02457e7a3a2a59df08c46c1cf66294c4f151ba72381a48d8e6f328fc71b9247fc686978673280890e210d5062bac7d945eb396dab37951216966111c804f56c3",
+        "filename": "scraped_data/amazon_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-08-04T17:14:17.630173"
+    },
+    {
+        "url": "https://google.com",
+        "title": "Google",
+        "contentHash": "56826c0862208c5e1a777ca7953afcb0a5bd9cc42cce59b1e5de890e966c713f2260f3e420b542f2ea8987a728eb70f5218c6e49286f0c11121a84024df8b6d0",
+        "filename": "scraped_data/google_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-08-04T17:14:17.693497"
+    },
+    {
+        "url": "https://dell.com",
+        "title": "Computers, Monitors & Technology Solutions | Dell USA",
+        "contentHash": "23583a48e726dc7a7acff3aade6f24d591881e47eb99c69a998f63ede7267d67cd41a800541d1c574f767f771425f5729d85b1e97e085bc4e4feef3f1e15eca7",
+        "filename": "scraped_data/dell_com.html",
+        "success": true,
+        "lastCrawlTime": "2024-08-04T17:14:17.863636"
+    }
+]
