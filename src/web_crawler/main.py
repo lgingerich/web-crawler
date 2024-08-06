@@ -12,10 +12,6 @@ logger = logging.getLogger(__name__)
 
 async def process(scraper, url):
     try:
-        # Ensure URL has the scheme
-        if not url.startswith(("http://", "https://")):
-            url = f"https://{url}"
-
         ########### Probably better way to handle this ############
         # Prepare filename and filepath
         parsed_url = urlparse(url)

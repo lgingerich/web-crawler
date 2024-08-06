@@ -23,9 +23,9 @@ class Scraper:
         self.headless = headless
         self.slow_mo = slow_mo
         self.metadata_file = metadata_file
-        os.makedirs(
-            os.path.dirname(metadata_file), exist_ok=True
-        )  # check if directory already exists
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(metadata_file), exist_ok=True)
 
     async def scrape_url(self, url: str) -> Tuple[str, str]:
         # Ensure URL has the proper scheme
