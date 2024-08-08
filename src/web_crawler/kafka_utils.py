@@ -6,6 +6,7 @@ from typing import Dict, Any
 # Setup logging
 logger = setup_logger()
 
+
 class KafkaManager:
     def __init__(self, bootstrap_servers: str = "localhost:9092"):
         self.bootstrap_servers = bootstrap_servers

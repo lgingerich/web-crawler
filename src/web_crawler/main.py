@@ -22,6 +22,7 @@ SCRAPER_CONFIG = {
     "metadata_file": os.path.join("scraped_data", "metadata.json"),
 }
 
+
 def setup_kafka(config):
     kafka_manager = KafkaManager(config["bootstrap_servers"])
     if not kafka_manager.topic_exists(config["topic_name"]):

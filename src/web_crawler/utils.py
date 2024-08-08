@@ -1,6 +1,7 @@
 import logging
 from colorlog import ColoredFormatter
 
+
 def setup_logger():
     """Set up the logger with colored output."""
     logger = logging.getLogger()
@@ -8,11 +9,11 @@ def setup_logger():
 
     # Color scheme for different log levels
     color_scheme = {
-        'DEBUG': 'cyan',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'red,bg_white',
+        "DEBUG": "cyan",
+        "INFO": "green",
+        "WARNING": "yellow",
+        "ERROR": "red",
+        "CRITICAL": "red,bg_white",
     }
 
     # Create a ColoredFormatter
@@ -22,7 +23,7 @@ def setup_logger():
         reset=True,
         log_colors=color_scheme,
         secondary_log_colors={},
-        style='%'
+        style="%",
     )
 
     # Create a stream handler for console output
