@@ -14,7 +14,8 @@ playwright = "^1.45.1"
 pytest-playwright = "^0.5.1"
 polars = "^1.2.1"
 aiofiles = "^24.1.0"
-confluent-kafka = "^2.5.0"
+confluent-kafka = "^2.4.0"
+colorlog = "^6.8.2"
 
 [tool.poetry.dev-dependencies]
 black = "^23.12.1"

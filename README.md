@@ -79,3 +79,4 @@ add more metadata for each url
     failedCrawls
     firstCrawlTime
     
+
