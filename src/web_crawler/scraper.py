@@ -2,15 +2,10 @@ import aiofiles
 from datetime import datetime
 import hashlib
 import json
-import logging
 import os
 from playwright.async_api import async_playwright
 from typing import Tuple, Dict, Any
-
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(module)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+from utils import logger
 
 
 class Scraper:

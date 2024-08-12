@@ -1,18 +1,15 @@
-from utils import setup_logger
+from utils import logger
 from confluent_kafka import Producer, Consumer
-from confluent_kafka.admin import AdminClient, NewTopic, ConfigResource, KafkaException
+from confluent_kafka.admin import AdminClient, NewTopic, KafkaException
 from typing import Dict, Any, Optional
 import json
-
-# Setup logging
-logger = setup_logger()
 
 
 class KafkaAdmin:
     def __init__(self, bootstrap_servers: str = "localhost:9092"):
         """
         Initialize the Kafka admin client.
-        
+
         :param bootstrap_servers: A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster
         """
         self.bootstrap_servers = bootstrap_servers
@@ -106,23 +103,17 @@ class KafkaProducer:
             self.producer.produce(
                 topic,
                 key=key,
-                value=json.dumps(value) if isinstance(value, dict) else value
+                value=json.dumps(value) if isinstance(value, dict) else value,
             )
             self.producer.poll(0)
         except Exception as e:
-            print(f"Error producing message: {e}")
+            logger.error(f"Error producing message: {e}")
 
     def flush(self):
         """
         Wait for all messages in the Producer queue to be delivered.
         """
         self.producer.flush()
-
-    # def close(self):
-    #     """
-    #     Flush any remaining messages and close the producer.
-    #     """
-    #     self.producer.flush()
 
 
 class KafkaConsumer:
@@ -170,13 +161,13 @@ class KafkaConsumer:
             logger.error(f"Consumer error: {msg.error()}")
             return None
         return {
-            'topic': msg.topic(),
-            'partition': msg.partition(),
-            'offset': msg.offset(),
-            'key': msg.key().decode('utf-8') if msg.key() else None,
-            'value': msg.value().decode('utf-8')
+            "topic": msg.topic(),
+            "partition": msg.partition(),
+            "offset": msg.offset(),
+            "key": msg.key().decode("utf-8") if msg.key() else None,
+            "value": msg.value().decode("utf-8"),
         }
-    
+
     def close(self):
         """
         Close the consumer connection.
