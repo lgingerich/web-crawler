@@ -7,7 +7,6 @@ from kafka_utils import KafkaAdmin, KafkaProducer, KafkaConsumer
 from scraper import Scraper
 from utils import logger
 
-
 # Load configuration from config.yaml
 with open("config.yaml", "r") as config_file:
     config = yaml.safe_load(config_file)
@@ -16,10 +15,15 @@ with open("config.yaml", "r") as config_file:
 KAFKA_CONFIG = config['kafka']
 SCRAPER_CONFIG = config['scraper']
 
-
 def setup_kafka(config):
     # Setup Kafka clients
     kafka_admin = KafkaAdmin(config["bootstrap_servers"])
+    
+    # Check if Kafka broker is available
+    if not kafka_admin.check_broker_availability(max_retries=5, retry_delay=2.0):
+        logger.error("Kafka broker is not available. Exiting.")
+        return None, None, None
+
     producer = KafkaProducer(config["bootstrap_servers"])
     consumer = KafkaConsumer(config["bootstrap_servers"], config["group_id"])
 
@@ -33,7 +37,6 @@ def setup_kafka(config):
 
     return kafka_admin, producer, consumer
 
-
 def setup_scraper(config):
     return Scraper(
         headless=config["headless"],
@@ -41,10 +44,8 @@ def setup_scraper(config):
         metadata_file=config["metadata_file"],
     )
 
-
 async def process_url(scraper, url):
     try:
-        ########### Probably better way to handle this ############
         # Prepare filename and filepath
         parsed_url = urlparse(url)
         filename = f"{parsed_url.netloc.replace('.', '_')}.html"
@@ -59,28 +60,27 @@ async def process_url(scraper, url):
                 await scraper.save_html(content, filepath)
                 hashed_content = scraper.hash_str(content)
                 logger.info(f"Saved HTML content for {url} to {filepath}")
+                await scraper.save_metadata(url, title, hashed_content, filepath, True)
+                logger.info(f"Successfully processed {url}")
             except IOError as e:
                 logger.error(f"Failed to save HTML for {url}: {e}")
                 await scraper.save_metadata(url, title, None, filepath, False)
-                return
-
-            await scraper.save_metadata(url, title, hashed_content, filepath, True)
-            logger.info(f"Successfully processed {url}")
         else:
             logger.warning(f"No content retrieved for {url}")
             await scraper.save_metadata(url, None, None, filepath, False)
 
+    except asyncio.CancelledError:
+        logger.info(f"Processing of {url} was cancelled")
+        raise
     except Exception as e:
-        logger.error(f"Unexpected error processing {url}: {e}")
+        logger.error(f"Unexpected error processing {url}: {e}", exc_info=True)
         await scraper.save_metadata(url, None, None, filepath, False)
-
 
 async def produce_urls(producer, topic, urls):
     for url in urls:
         producer.produce(topic, value=url)
         logger.info(f"Produced URL: {url}")
-    producer.flush()
-
+    producer.close()
 
 async def consume_and_process(consumer, scraper, topic):
     consumer.subscribe(topic)
@@ -123,49 +123,52 @@ async def consume_and_process(consumer, scraper, topic):
         consumer.close()
         logger.info("Consumer closed")
 
-
 async def run_kafka_scraper(producer, consumer, scraper, kafka_config, scraper_config):
-    producer_task = asyncio.create_task(
-        produce_urls(producer, kafka_config["topic_name"], scraper_config["urls"])
-    )
-    consumer_task = asyncio.create_task(
-        consume_and_process(consumer, scraper, kafka_config["topic_name"])
-    )
-
-    # Wait for both tasks to start
-    await asyncio.sleep(1)
-
-    # Wait for producer to finish
-    await producer_task
-
-    # Give consumer some time to process messages
-    await asyncio.sleep(10)  # Adjust this time as needed
-
-    # Cancel consumer task
-    consumer_task.cancel()
-
     try:
-        await consumer_task
-    except asyncio.CancelledError:
-        print("Consumer task was cancelled")
+        producer_task = asyncio.create_task(
+            produce_urls(producer, kafka_config["topic_name"], scraper_config["urls"])
+        )
+        consumer_task = asyncio.create_task(
+            consume_and_process(consumer, scraper, kafka_config["topic_name"])
+        )
 
+        await producer_task
+        await asyncio.wait_for(consumer_task, timeout=60)  # Adjust timeout as needed
+    except asyncio.TimeoutError:
+        logger.info("Consumer task timed out. Shutting down.")
+    except asyncio.CancelledError:
+        logger.info("Kafka scraper tasks were cancelled")
+    except Exception as e:
+        logger.error(f"Unexpected error in run_kafka_scraper: {e}", exc_info=True)
+    finally:
+        producer.close()
+        consumer.close()
 
 def main():
-    # Kafka Setup
-    kafka_admin, producer, consumer = setup_kafka(KAFKA_CONFIG)
+    try:
+        # Kafka Setup
+        kafka_admin, producer, consumer = setup_kafka(KAFKA_CONFIG)
+        if not all([kafka_admin, producer, consumer]):
+            return
 
-    # Scraper Setup
-    scraper = setup_scraper(SCRAPER_CONFIG)
+        # Scraper Setup
+        scraper = setup_scraper(SCRAPER_CONFIG)
 
-    # Run Kafka-integrated scraper
-    asyncio.run(
-        run_kafka_scraper(producer, consumer, scraper, KAFKA_CONFIG, SCRAPER_CONFIG)
-    )
-
-    # Cleanup
-    producer.flush()
-    consumer.close()
-
+        # Run Kafka-integrated scraper
+        asyncio.run(
+            run_kafka_scraper(producer, consumer, scraper, KAFKA_CONFIG, SCRAPER_CONFIG)
+        )
+    except KeyboardInterrupt:
+        logger.info("Process interrupted by user. Shutting down gracefully...")
+    except Exception as e:
+        logger.error(f"Unexpected error in main: {e}", exc_info=True)
+    finally:
+        # Cleanup
+        if 'producer' in locals():
+            producer.close()
+        if 'consumer' in locals():
+            consumer.close()
+        logger.info("Kafka scraper shutdown complete.")
 
 if __name__ == "__main__":
     main()
