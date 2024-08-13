@@ -1,22 +1,19 @@
-# import psycopg
-# from psycopg.rows import dict_row
-# import json
-# from contextlib import contextmanager
-# from utils import logger
-
-
 import psycopg
 from psycopg.rows import dict_row
 import json
 from contextlib import contextmanager
 from utils import logger
-from psycopg.conninfo import make_conninfo
+
 
 class DatabaseManager:
     def __init__(self, dbname, user, password, host="localhost", port=5432):
-        self.conn_params = (
-            f"dbname={dbname} user={user} password={password} host={host} port={port}"
-        )
+        self.conn_params = {
+            "dbname": dbname,
+            "user": user,
+            "password": password,
+            "host": host,
+            "port": port,
+        }
         self.conn = None
 
     def __enter__(self):
@@ -29,7 +26,7 @@ class DatabaseManager:
         if self.conn:
             self.conn.close()
             self.conn = None
-            self.logger.info("Database connection closed")
+            logger.info("Database connection closed")
 
     def connect(self):
         if self.conn is None or self.conn.closed:
@@ -73,9 +70,9 @@ class DatabaseManager:
                     CREATE INDEX IF NOT EXISTS idx_url_data_data ON url_data USING GIN (data);
                 """
                 )
-            self.logger.info("url_data table and indexes created or already exist")
+            logger.info("url_data table and indexes created or already exist")
         except Exception as e:
-            self.logger.error(f"Failed to create table: {e}")
+            logger.error(f"Failed to create table: {e}")
             raise
 
     def insert_record(self, url, data):
@@ -85,9 +82,9 @@ class DatabaseManager:
                     "INSERT INTO url_data (url, data) VALUES (%s, %s) ON CONFLICT (url) DO UPDATE SET data = %s",
                     (url, json.dumps(data), json.dumps(data)),
                 )
-            self.logger.info(f"Record inserted or updated for URL: {url}")
+            logger.info(f"Record inserted or updated for URL: {url}")
         except Exception as e:
-            self.logger.error(f"Failed to insert/update record for URL {url}: {e}")
+            logger.error(f"Failed to insert/update record for URL {url}: {e}")
             raise
 
     def update_record(self, url, record, value):
@@ -98,14 +95,12 @@ class DatabaseManager:
                     ("{" + record + "}", json.dumps(value), url),
                 )
                 if cur.rowcount == 0:
-                    self.logger.warning(f"No record found for URL: {url}")
+                    logger.warning(f"No record found for URL: {url}")
                     return False
-            self.logger.info(f"Record updated for URL: {url}, field: {record}")
+            logger.info(f"Record updated for URL: {url}, field: {record}")
             return True
         except Exception as e:
-            self.logger.error(
-                f"Failed to update record for URL {url}, field {record}: {e}"
-            )
+            logger.error(f"Failed to update record for URL {url}, field {record}: {e}")
             raise
 
     def get_record(self, url):
@@ -140,8 +135,8 @@ class DatabaseManager:
                 )
 
                 result = cur.fetchone()
-                self.logger.info(f"Record upserted for URL: {url}")
+                logger.info(f"Record upserted for URL: {url}")
                 return result["crawl_count"] if result else 1
         except Exception as e:
-            self.logger.error(f"Failed to upsert record for URL {url}: {e}")
+            logger.error(f"Failed to upsert record for URL {url}: {e}")
             raise

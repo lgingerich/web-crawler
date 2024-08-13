@@ -4,18 +4,13 @@ kafka:
   group_id: "scraper_group"
 
 scraper:
-  urls:
-    - "https://google.com"
-    - "https://amazon.com"
-    - "https://example.com"
-    - "https://dell.com"
-  headless: true
+  headless: True
   slow_mo: 0  # in milliseconds
   metadata_file: "scraped_data/metadata.json"
 
 database:
-  dbname: "your_db_name"
-  user: "your_username"
-  password: "your_password"
+  dbname: "web_crawler_db"
+  user: "db_user"
+  password: "password"
   host: "localhost"
   port: 5432

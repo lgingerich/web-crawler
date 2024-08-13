@@ -50,7 +50,7 @@ def setup_kafka(config):
 
 
 def setup_scraper(scraper_config, db):
-    return Scraper(db, **scraper_config)
+    return Scraper(**scraper_config, db=db)
 
 
 async def process_url(scraper, url):
@@ -152,9 +152,16 @@ async def consume_and_process(consumer, scraper, topic):
 
 
 async def run_kafka_scraper(producer, consumer, scraper, kafka_config, scraper_config):
+    urls = [
+        "https://google.com",
+        "https://amazon.com",
+        "https://example.com",
+        "https://dell.com",
+    ]
+
     try:
         producer_task = asyncio.create_task(
-            produce_urls(producer, kafka_config["topic_name"], scraper_config["urls"])
+            produce_urls(producer, kafka_config["topic_name"], urls)
         )
         consumer_task = asyncio.create_task(
             consume_and_process(consumer, scraper, kafka_config["topic_name"])
@@ -181,7 +188,7 @@ def main():
             return
 
         # Database Setup
-        db = DatabaseManager(DB_CONFIG)
+        db = DatabaseManager(**DB_CONFIG)
         db.create_table()  # Ensure the table exists
 
         # Scraper Setup
