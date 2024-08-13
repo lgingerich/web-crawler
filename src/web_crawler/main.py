@@ -1,29 +1,20 @@
 import asyncio
 import os
 import time
+import yaml
 from urllib.parse import urlparse
 from kafka_utils import KafkaAdmin, KafkaProducer, KafkaConsumer
 from scraper import Scraper
 from utils import logger
 
-# Configuration
-KAFKA_CONFIG = {
-    "topic_name": "url_queue",
-    "bootstrap_servers": "localhost:9092",
-    "group_id": "scraper_group",
-}
 
-SCRAPER_CONFIG = {
-    "urls": [
-        "https://google.com",
-        "https://amazon.com",
-        "https://example.com",
-        "https://dell.com",
-    ],
-    "headless": True,
-    "slow_mo": 0,  # in milliseconds
-    "metadata_file": os.path.join("scraped_data", "metadata.json"),
-}
+# Load configuration from config.yaml
+with open("config.yaml", "r") as config_file:
+    config = yaml.safe_load(config_file)
+
+# Access configurations
+KAFKA_CONFIG = config['kafka']
+SCRAPER_CONFIG = config['scraper']
 
 
 def setup_kafka(config):
