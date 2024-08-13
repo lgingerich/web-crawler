@@ -1,11 +1,11 @@
 import aiofiles
 from datetime import datetime
 import hashlib
-import json
 import os
 from playwright.async_api import async_playwright
 from typing import Tuple, Dict, Any
 from utils import logger
+from database import DatabaseManager
 
 
 class Scraper:
@@ -14,10 +14,12 @@ class Scraper:
         headless: bool = True,
         slow_mo: int = 0,
         metadata_file: str = "scraped_data/metadata.json",
+        db: DatabaseManager = None,
     ):
         self.headless = headless
         self.slow_mo = slow_mo
         self.metadata_file = metadata_file
+        self.db = db
 
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(metadata_file), exist_ok=True)
@@ -64,50 +66,31 @@ class Scraper:
             raise
 
     async def save_metadata(
-        self, url: str, title: str, content_hash: str, filename: str, success: bool
+        self,
+        url: str,
+        title: str,
+        content_hash: str,
+        filename: str,
+        success: bool,
+        status_code: int,
+        content_type: str,
     ) -> None:
         metadata: Dict[str, Any] = {
-            "url": url,
             "title": title,
-            "contentHash": content_hash,
+            "last_crawl_time": datetime.now().isoformat(),
+            "crawl_success": success,
+            "content_hash": content_hash,
             "filename": filename,
-            "success": success,
-            "lastCrawlTime": datetime.now().isoformat(),
+            "metadata": {
+                "status_code": status_code,
+                "content_type": content_type,
+                "crawl_depth": 1,  # You might want to implement logic to determine this
+            },
         }
 
         try:
-            # Read existing data
-            async with aiofiles.open(self.metadata_file, "r") as f:
-                content = await f.read()
-                data = json.loads(content) if content else []
-
-            # Update or append the new metadata
-            updated = False
-            for item in data:
-                if item["url"] == url:
-                    item.update(metadata)
-                    updated = True
-                    break
-
-            if not updated:
-                data.append(metadata)
-
-            # Write the updated data back to the file
-            async with aiofiles.open(self.metadata_file, "w") as f:
-                await f.write(json.dumps(data, indent=4))
-
-            logger.info(f"Metadata {'updated' if updated else 'saved'} for {url}")
-        except FileNotFoundError:
-            async with aiofiles.open(self.metadata_file, "w") as f:
-                await f.write(json.dumps([metadata], indent=4))
-            logger.info(f"Created new metadata file and saved data for {url}")
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON in metadata file. Overwriting with new data.")
-            async with aiofiles.open(self.metadata_file, "w") as f:
-                await f.write(json.dumps([metadata], indent=4))
-        except IOError as e:
-            logger.error(f"IO error when saving metadata for {url}: {e}")
-            raise
+            self.db.upsert_record(url, metadata)
+            logger.info(f"Metadata saved for {url}")
         except Exception as e:
-            logger.error(f"Unexpected error when saving metadata for {url}: {e}")
+            logger.error(f"Error saving metadata for {url}: {e}")
             raise
