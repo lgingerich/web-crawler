@@ -1069,6 +1069,23 @@ slack = ["slack-sdk"]
 telegram = ["requests"]
 
 [[package]]
+name = "tranco"
+version = "0.8.1"
+description = "Tranco: A Research-Oriented Top Sites Ranking Hardened Against Manipulation"
+optional = false
+python-versions = "*"
+files = [
+    {file = "tranco-0.8.1-py3-none-any.whl", hash = "sha256:69fda76fd46793a0dbbd96afe44d4ea7c6fd88077cc0ec74148b920571e0774a"},
+    {file = "tranco-0.8.1.tar.gz", hash = "sha256:b44ce840e90d0d7d7ad3b9575403e8cd32ddb93496c86379612edfdb4d4d6378"},
+]
+
+[package.dependencies]
+requests = "*"
+
+[package.extras]
+dev = ["codetiming", "pytest"]
+
+[[package]]
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -1110,4 +1127,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12.4"
-content-hash = "56e6b78d3c0dcb5a1e7c820df085ebee8fdd36d2c48ea2f1ba8068cc5a3d4686"
+content-hash = "c87831e7a6d8d7ace4c76e7f12199c386ae340cf0f9f3e306789fbc2b40e03ab"
