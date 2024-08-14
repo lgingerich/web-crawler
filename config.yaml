@@ -2,6 +2,11 @@ kafka:
   topic_name: "url_queue"
   bootstrap_servers: "localhost:9092"
   group_id: "scraper_group"
+  auto_offset_reset: "earliest"
+  enable_auto_commit: true
+  max_poll_interval_ms: 300000
+  session_timeout_ms: 45000
+  socket_timeout_ms: 60000
 
 scraper:
   headless: True

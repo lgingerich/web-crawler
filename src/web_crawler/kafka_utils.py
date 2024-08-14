@@ -1,6 +1,6 @@
 from utils import logger
 from confluent_kafka import Producer, Consumer
-from confluent_kafka.admin import AdminClient, NewTopic, KafkaException
+from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
 from typing import Dict, Any, Optional
 import json
 import time
@@ -188,30 +188,28 @@ class KafkaProducer:
 
 
 class KafkaConsumer:
-    def __init__(
-        self, bootstrap_servers: str = "localhost:9092", group_id: str = "url_group"
-    ):
+    def __init__(self, config):
         """
         Initialize the Kafka consumer.
 
         :param bootstrap_servers: A comma-separated list of host and port pairs that are the addresses of the Kafka brokers
         :param group_id: An identifier for the consumer group this consumer belongs to
+        :param auto_offset_reset: Where to start reading messages when no offset is stored
+        :param enable_auto_commit: Whether to automatically commit offsets
+        :param max_poll_interval_ms: Maximum delay between invocations of poll()
+        :param session_timeout_ms: Timeout used to detect consumer failures
+        :param socket_timeout_ms: Timeout for network requests
         """
-        self.bootstrap_servers = bootstrap_servers
-        self.group_id = group_id
-        self.consumer = Consumer(
-            {
-                "bootstrap.servers": bootstrap_servers,
-                "group.id": group_id,
-                "auto.offset.reset": "earliest",
-                "enable.auto.commit": "true",  # Changed to 'false' for manual offset commit
-                "api.version.request": True,
-                "api.version.fallback.ms": 0,
-                "socket.timeout.ms": 10000,  # 10 seconds
-                "security.protocol": "PLAINTEXT",
-                "logger": kafka_log_handler,
-            }
-        )
+        self.consumer = Consumer({
+            "bootstrap.servers": config["bootstrap_servers"],
+            "group.id": config["group_id"],
+            "auto.offset.reset": config["auto_offset_reset"],
+            "enable.auto.commit": str(config["enable_auto_commit"]).lower(),
+            "max.poll.interval.ms": config["max_poll_interval_ms"],
+            "session.timeout.ms": config["session_timeout_ms"],
+            "socket.timeout.ms": config["socket_timeout_ms"],
+        })
+        self.subscribed = False
 
     def subscribe(self, topic: str) -> None:
         """
@@ -221,6 +219,7 @@ class KafkaConsumer:
         :return: None
         """
         self.consumer.subscribe([topic])
+        self.subscribed = True  # Set the subscribed flag to True
         logger.info(f"Subscribed to topic: {topic}")
 
     def poll(self, timeout: float = 1.0) -> Dict[str, Any]:
@@ -230,11 +229,19 @@ class KafkaConsumer:
         :param timeout: The maximum time to block waiting for a message
         :return: A dictionary containing the message details, or None if no message is available
         """
+        if not self.subscribed:
+            raise RuntimeError("Consumer is not subscribed to any topics")
+
         msg = self.consumer.poll(timeout)
+
         if msg is None:
             return None
+
         if msg.error():
-            logger.error(f"Consumer error: {msg.error()}")
+            if msg.error().code() == KafkaError._PARTITION_EOF:
+                logger.info("Reached end of partition")
+            else:
+                logger.error(f"Error while polling: {msg.error()}")
             return None
         return {
             "topic": msg.topic(),
@@ -249,3 +256,9 @@ class KafkaConsumer:
         Close the consumer connection.
         """
         self.consumer.close()
+
+    def commit(self):
+        """
+        Commit current offsets for all assigned partitions.
+        """
+        self.consumer.commit()

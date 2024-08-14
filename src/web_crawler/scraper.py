@@ -1,9 +1,14 @@
 import aiofiles
+import asyncio
 from datetime import datetime
 import hashlib
 import os
-from playwright.async_api import async_playwright
-from typing import Tuple, Dict, Any
+from playwright.async_api import (
+    async_playwright,
+    Error as PlaywrightError,
+    TimeoutError as PlaywrightTimeoutError,
+)
+from typing import Tuple, Dict, Any, Optional
 from utils import logger
 from database import DatabaseManager
 
@@ -24,31 +29,80 @@ class Scraper:
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(metadata_file), exist_ok=True)
 
-    async def scrape_url(self, url: str) -> Tuple[str, str]:
-        # Ensure URL has the proper scheme
+    async def scrape_url(
+        self, url: str
+    ) -> Tuple[Optional[str], Optional[str], Optional[dict]]:
         if not url.startswith(("http://", "https://")):
             url = f"https://{url}"
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=self.headless, slow_mo=self.slow_mo
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=self.headless, slow_mo=self.slow_mo
+                )
+                try:
+                    page = await browser.new_page()
+                    response = await page.goto(
+                        url, wait_until="networkidle", timeout=30000
+                    )
+
+                    if response is None:
+                        raise PlaywrightError("No response received")
+
+                    title = await page.title()
+                    content = await page.locator("body").inner_text()
+
+                    response_info = {
+                        "status": response.status,
+                        "status_text": response.status_text,
+                        "headers": dict(response.headers),
+                        "url": response.url,
+                    }
+
+                    return title, content, response_info
+
+                except PlaywrightTimeoutError as e:
+                    logger.error(f"Timeout error scraping {url}: {str(e)}")
+                    return (
+                        None,
+                        None,
+                        {"status": 408, "error": str(e), "error_type": "timeout"},
+                    )
+                except PlaywrightError as e:
+                    error_info = {
+                        "status": 500,
+                        "error": str(e),
+                        "error_type": "playwright",
+                    }
+                    if "ERR_CONNECTION_REFUSED" in str(e):
+                        error_info["status"] = 503
+                        error_info["error_type"] = "connection_refused"
+                    elif "ERR_NAME_NOT_RESOLVED" in str(e):
+                        error_info["status"] = 502
+                        error_info["error_type"] = "dns_resolution_failed"
+                    logger.error(f"Playwright error scraping {url}: {str(e)}")
+                    return None, None, error_info
+                finally:
+                    await browser.close()
+
+        except asyncio.CancelledError:
+            logger.info(f"Scraping of {url} was cancelled")
+            return (
+                None,
+                None,
+                {
+                    "status": 499,
+                    "error": "Client closed request",
+                    "error_type": "cancelled",
+                },
             )
-            page = await browser.new_page()
-
-            try:
-                await page.goto(url)
-                title = await page.title()
-                # content = await page.content() # Get full page content
-
-                content = await page.locator(
-                    "body"
-                ).inner_text()  # Get content of the body tag
-                return title, content
-            except Exception as e:
-                logger.error(f"Error scraping {url}: {str(e)}")
-                return None, None
-            finally:
-                await browser.close()
+        except Exception as e:
+            logger.error(f"Unexpected error scraping {url}: {str(e)}", exc_info=True)
+            return (
+                None,
+                None,
+                {"status": 500, "error": str(e), "error_type": "unexpected"},
+            )
 
     def hash_str(self, content: str) -> str:
         return hashlib.blake2b(content.encode("utf-8")).hexdigest()

@@ -6,7 +6,8 @@ from urllib.parse import urlparse
 from kafka_utils import KafkaAdmin, KafkaProducer, KafkaConsumer
 from scraper import Scraper
 from database import DatabaseManager
-from utils import logger
+from utils import logger, fetch_tranco_list
+from confluent_kafka import KafkaError
 
 # Load configuration from config.yaml
 with open("config.yaml", "r") as config_file:
@@ -28,7 +29,7 @@ def setup_kafka(config):
         return None, None, None
 
     producer = KafkaProducer(config["bootstrap_servers"])
-    consumer = KafkaConsumer(config["bootstrap_servers"], config["group_id"])
+    consumer = KafkaConsumer(config)  # Pass the entire config dictionary
 
     # Create topic if it doesn't exist
     if not kafka_admin.topic_exists(config["topic_name"]):
@@ -41,65 +42,75 @@ def setup_kafka(config):
     return kafka_admin, producer, consumer
 
 
-# def setup_scraper(config):
-#     return Scraper(
-#         headless=config["headless"],
-#         slow_mo=config["slow_mo"],
-#         metadata_file=config["metadata_file"],
-#     )
-
-
 def setup_scraper(scraper_config, db):
     return Scraper(**scraper_config, db=db)
 
 
+def load_tranco_list(
+    list_date: str = "2024-01-01", top_n: int = 10000, cache_dir: str = "url_data"
+):
+    """
+    Load the Tranco list from local cache or download if not available.
+
+    :param list_date: Date of the list to fetch ('latest' or YYYY-MM-DD format)
+    :param top_n: Number of top domains to fetch
+    :param cache_dir: Directory to save/load the Tranco list
+    :return: List of domain names
+    """
+    file_name = f"tranco_top_{top_n}_{list_date}.txt"
+    file_path = os.path.join(cache_dir, file_name)
+
+    if not os.path.exists(file_path):
+        logger.info("Tranco list not found locally. Downloading...")
+        file_path = fetch_tranco_list(list_date, top_n, cache_dir)
+
+    with open(file_path, "r") as f:
+        domains = [line.strip() for line in f]
+
+    return domains
+
+
 async def process_url(scraper, url):
-    try:
-        # Prepare filename and filepath
-        parsed_url = urlparse(url)
-        filename = f"{parsed_url.netloc.replace('.', '_')}.html"
-        filepath = os.path.join("scraped_data", filename)
+    parsed_url = urlparse(url)
+    filename = f"{parsed_url.netloc.replace('.', '_')}.html"
+    filepath = os.path.join("scraped_data", filename)
 
-        # Scrape URL
-        title, content = await scraper.scrape_url(url)
+    title, content, response_info = await scraper.scrape_url(url)
 
-        # Save content and metadata
-        if content:
-            try:
-                await scraper.save_html(content, filepath)
-                hashed_content = scraper.hash_str(content)
-                logger.info(f"Saved HTML content for {url} to {filepath}")
+    if content:
+        try:
+            await scraper.save_html(content, filepath)
+            hashed_content = scraper.hash_str(content)
+            logger.info(f"Saved HTML content for {url} to {filepath}")
 
-                # Simulate getting status code and content type
-                # In a real scenario, you'd get these from the HTTP response
-                status_code = 200
-                content_type = "text/html"
+            status_code = response_info["status"]
+            content_type = response_info["headers"].get("content-type", "text/html")
 
-                await scraper.save_metadata(
-                    url,
-                    title,
-                    hashed_content,
-                    filename,
-                    True,
-                    status_code,
-                    content_type,
-                )
-                logger.info(f"Successfully processed {url}")
-            except IOError as e:
-                logger.error(f"Failed to save HTML for {url}: {e}")
-                await scraper.save_metadata(
-                    url, title, None, filename, False, 500, None
-                )
-        else:
-            logger.warning(f"No content retrieved for {url}")
-            await scraper.save_metadata(url, None, None, filename, False, 404, None)
+            await scraper.save_metadata(
+                url,
+                title,
+                hashed_content,
+                filename,
+                True,
+                status_code,
+                content_type,
+            )
+            logger.info(f"Successfully processed {url}")
+        except IOError as e:
+            logger.error(f"Failed to save HTML for {url}: {e}")
+            await scraper.save_metadata(url, title, None, filename, False, 500, None)
+    else:
+        status_code = response_info.get("status", 404)
+        error_message = response_info.get("error", "Unknown error")
+        error_type = response_info.get("error_type", "unknown")
 
-    except asyncio.CancelledError:
-        logger.info(f"Processing of {url} was cancelled")
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error processing {url}: {e}", exc_info=True)
-        await scraper.save_metadata(url, None, None, filename, False, 500, None)
+        logger.warning(f"No content retrieved for {url}")
+        logger.error(f"Error scraping {url}: {error_message}")
+        logger.info(f"Error type: {error_type}, Status code: {status_code}")
+
+        await scraper.save_metadata(url, None, None, filename, False, status_code, None)
+
+    logger.info(f"Finished processing {url}")
 
 
 async def produce_urls(producer, topic, urls):
@@ -111,54 +122,46 @@ async def produce_urls(producer, topic, urls):
 
 async def consume_and_process(consumer, scraper, topic):
     consumer.subscribe(topic)
-    last_message_time = time.time()
-    timeout = 30  # 30 seconds timeout
+    
+    messages_processed = 0
+    end_of_stream = False
 
     try:
-        while True:
-            logger.debug("Before poll")
+        while not end_of_stream:
             msg = consumer.poll(1.0)
-            logger.debug(f"After poll: {msg}")
 
-            current_time = time.time()
             if msg is None:
-                if current_time - last_message_time > timeout:
-                    logger.info(f"No new message for {timeout} seconds. Exiting.")
-                    break
                 continue
 
-            # Reset the last message time
-            last_message_time = current_time
+            if msg == {}:  # Empty dictionary indicates no message
+                continue
 
-            if isinstance(msg, dict):
-                if "value" in msg:
-                    url = msg["value"]
-                    if isinstance(url, bytes):
-                        url = url.decode("utf-8")
-                    logger.info(f"Received message: {msg}")
-                    logger.info(f"Processed URL: {url}")
-                    await process_url(scraper, url)
+            if 'error' in msg:
+                if msg['error'] == KafkaError._PARTITION_EOF:
+                    logger.info('End of partition reached')
+                    end_of_stream = True
                 else:
-                    logger.warning(f"Message has no 'value' key: {msg}")
+                    logger.error(f"Error: {msg['error']}")
+                    break
             else:
-                logger.warning(f"Unexpected message format: {msg}")
+                url = msg['value']
+                logger.info(f"Processing URL: {url}")
+                await process_url(scraper, url)
+                messages_processed += 1
+
+                if messages_processed % 100 == 0:
+                    logger.info(f"Processed {messages_processed} messages so far")
+
     except asyncio.CancelledError:
         logger.info("Consume and process task was cancelled")
     except Exception as e:
         logger.error(f"Unexpected error in consume_and_process: {e}", exc_info=True)
     finally:
         consumer.close()
-        logger.info("Consumer closed")
+        logger.info(f"Consumer closed. Processed {messages_processed} messages in total")
 
 
-async def run_kafka_scraper(producer, consumer, scraper, kafka_config, scraper_config):
-    urls = [
-        "https://google.com",
-        "https://amazon.com",
-        "https://example.com",
-        "https://dell.com",
-    ]
-
+async def run_kafka_scraper(producer, consumer, scraper, urls, kafka_config):
     try:
         producer_task = asyncio.create_task(
             produce_urls(producer, kafka_config["topic_name"], urls)
@@ -168,9 +171,7 @@ async def run_kafka_scraper(producer, consumer, scraper, kafka_config, scraper_c
         )
 
         await producer_task
-        await asyncio.wait_for(consumer_task, timeout=60)  # Adjust timeout as needed
-    except asyncio.TimeoutError:
-        logger.info("Consumer task timed out. Shutting down.")
+        await consumer_task  # Remove the timeout here
     except asyncio.CancelledError:
         logger.info("Kafka scraper tasks were cancelled")
     except Exception as e:
@@ -191,12 +192,16 @@ def main():
         db = DatabaseManager(**DB_CONFIG)
         db.create_table()  # Ensure the table exists
 
+        # Get list of URLs to crawl
+        url_list = load_tranco_list()
+        print(f"Loaded {len(url_list)} domains from Tranco list")
+
         # Scraper Setup
         scraper = setup_scraper(SCRAPER_CONFIG, db)
 
         # Run Kafka-integrated scraper
         asyncio.run(
-            run_kafka_scraper(producer, consumer, scraper, KAFKA_CONFIG, SCRAPER_CONFIG)
+            run_kafka_scraper(producer, consumer, scraper, url_list, KAFKA_CONFIG)
         )
     except KeyboardInterrupt:
         logger.info("Process interrupted by user. Shutting down gracefully...")
