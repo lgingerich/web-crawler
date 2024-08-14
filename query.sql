@@ -33,9 +33,5 @@ SELECT
     ROUND(
         (SUM(CASE WHEN data->>'crawl_success' = 'true' THEN 1 ELSE 0 END)::NUMERIC / COUNT(*))::NUMERIC, 
     2) AS crawl_success_rate 
-FROM url_data;SELECT 
-    ROUND(
-        (SUM(CASE WHEN data->>'crawl_success' = 'true' THEN 1 ELSE 0 END)::NUMERIC / COUNT(*))::NUMERIC, 
-    2) AS crawl_success_rate 
 FROM url_data;
 ------------------------------------------------
