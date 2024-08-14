@@ -58,6 +58,13 @@ poetry run ruff .
 
 Ruff will analyze your code for potential errors and style issues.
 
+## Profile Code
+
+- Set `PROFILE=1` in `run_scraper.sh`
+- Run:
+```bash
+snakeviz output.prof
+```
 
 
 # Notes / To Do

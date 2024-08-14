@@ -178,3 +178,4 @@ pyrightconfig.json
 *.json
 *.txt
 *.csv
+*.prof
