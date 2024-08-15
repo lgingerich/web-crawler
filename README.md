@@ -1,8 +1,8 @@
 # Performance Benchmarks
 
-| Date       | URL's Crawled per Second (Total) | URL's Crawled per Second (Successful) | Crawl Success Rate (%) | Commit Hash                              |
-|------------|----------------------------------|---------------------------------------|------------------------|------------------------------------------|
-| 2024-08-14 | 0.27                             | 0.16                                  | 56%                    | 267531120494ea6d4ecb291b66ec7fc561361e09 |
+| Date       | URL's Crawled per Second (Total) | URL's Crawled per Second (Successful) | Crawl Success Rate (%) | Commit Hash                              | Notes                      |
+|------------|----------------------------------|---------------------------------------|------------------------|------------------------------------------| ---------------------------|
+| 2024-08-14 | 0.27                             | 0.16                                  | 56%                    | 267531120494ea6d4ecb291b66ec7fc561361e09 | Basic async implementation |
 
 
 # Development
@@ -89,3 +89,15 @@ cleanup `metadata.json`
     this shouldn't be created anymore
 
 maybe not all url html data getting downloaded
+
+
+
+
+
+
+kafka improvements
+
+    batch send url's to kafka
+        do it time based
+
+    
