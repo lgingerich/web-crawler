@@ -143,7 +143,7 @@ class Scraper:
         }
 
         try:
-            self.db.upsert_record(url, metadata)
+            await self.db.async_upsert_record(url, metadata)
             logger.info(f"Metadata saved for {url}")
         except Exception as e:
             logger.error(f"Error saving metadata for {url}: {e}")

@@ -19,12 +19,12 @@ SCRAPER_CONFIG = config["scraper"]
 DB_CONFIG = config["database"]
 
 
-def setup_kafka(config):
+async def setup_kafka(config):
     # Setup Kafka clients
     kafka_admin = KafkaAdmin(config["bootstrap_servers"])
 
     # Check if Kafka broker is available
-    if not kafka_admin.check_broker_availability(max_retries=5, retry_delay=2.0):
+    if not await kafka_admin.async_check_broker_availability(max_retries=5, retry_delay=2.0):
         logger.error("Kafka broker is not available. Exiting.")
         return None, None, None
 
@@ -32,15 +32,14 @@ def setup_kafka(config):
     consumer = KafkaConsumer(config)  # Pass the entire config dictionary
 
     # Create topic if it doesn't exist
-    if not kafka_admin.topic_exists(config["topic_name"]):
-        kafka_admin.create_topic(
+    if not await kafka_admin.async_topic_exists(config["topic_name"]):
+        await kafka_admin.async_create_topic(
             config["topic_name"], num_partitions=1, replication_factor=1
         )
     else:
         logger.info(f"Topic {config['topic_name']} already exists")
 
     return kafka_admin, producer, consumer
-
 
 def setup_scraper(scraper_config, db):
     return Scraper(**scraper_config, db=db)
@@ -114,51 +113,35 @@ async def process_url(scraper, url):
 
 
 async def produce_urls(producer, topic, urls):
-    for url in urls:
-        producer.produce(topic, value=url)
-        logger.info(f"Produced URL: {url}")
-    producer.close()
+    try:
+        for url in urls:
+            await producer.async_produce(topic, value=url)
+            logger.info(f"Produced URL: {url}")
+
+        # Flush after producing all URLs
+        messages_in_queue = await producer.async_flush()
+        logger.info(f"All URLs have been produced. Messages still in queue: {messages_in_queue}")
+    except Exception as e:
+        logger.error(f"Error in produce_urls: {e}")
+        raise
 
 
 async def consume_and_process(consumer, scraper, topic):
-    consumer.subscribe(topic)
+    await consumer.async_subscribe(topic)
     
-    messages_processed = 0
-    end_of_stream = False
-
     try:
-        while not end_of_stream:
-            msg = consumer.poll(1.0)
-
-            if msg is None:
-                continue
-
-            if msg == {}:  # Empty dictionary indicates no message
-                continue
-
-            if 'error' in msg:
-                if msg['error'] == KafkaError._PARTITION_EOF:
-                    logger.info('End of partition reached')
-                    end_of_stream = True
-                else:
-                    logger.error(f"Error: {msg['error']}")
-                    break
-            else:
-                url = msg['value']
-                logger.info(f"Processing URL: {url}")
-                await process_url(scraper, url)
-                messages_processed += 1
-
-                if messages_processed % 100 == 0:
-                    logger.info(f"Processed {messages_processed} messages so far")
-
+        while True:
+            msg = await consumer.async_poll(1.0)
+            if msg:
+                # Process the message
+                await process_url(scraper, msg['value'])
+                await consumer.async_commit()
     except asyncio.CancelledError:
         logger.info("Consume and process task was cancelled")
     except Exception as e:
         logger.error(f"Unexpected error in consume_and_process: {e}", exc_info=True)
     finally:
-        consumer.close()
-        logger.info(f"Consumer closed. Processed {messages_processed} messages in total")
+        await consumer.async_close()
 
 
 async def run_kafka_scraper(producer, consumer, scraper, urls, kafka_config):
@@ -170,27 +153,47 @@ async def run_kafka_scraper(producer, consumer, scraper, urls, kafka_config):
             consume_and_process(consumer, scraper, kafka_config["topic_name"])
         )
 
+        # Wait for the producer to finish
         await producer_task
-        await consumer_task  # Remove the timeout here
+        logger.info("Producer task completed")
+
+        # Let the consumer run for a set time or until a condition is met
+        try:
+            await asyncio.wait_for(consumer_task, timeout=3600)  # 1 hour timeout
+        except asyncio.TimeoutError:
+            logger.info("Consumer task timed out")
+
     except asyncio.CancelledError:
         logger.info("Kafka scraper tasks were cancelled")
     except Exception as e:
         logger.error(f"Unexpected error in run_kafka_scraper: {e}", exc_info=True)
     finally:
-        producer.close()
-        consumer.close()
+        await producer.async_close()
+        await consumer.async_close()
 
 
-def main():
+async def cleanup(producer, consumer, db):
+    if producer:
+        await producer.async_close()
+    if consumer:
+        await consumer.async_close()
+    if db:
+        await db.async_close()
+    logger.info("Web crawler shutdown complete.")
+
+
+async def main():
     try:
         # Kafka Setup
-        kafka_admin, producer, consumer = setup_kafka(KAFKA_CONFIG)
+        kafka_admin, producer, consumer = await setup_kafka(KAFKA_CONFIG)
         if not all([kafka_admin, producer, consumer]):
             return
 
         # Database Setup
         db = DatabaseManager(**DB_CONFIG)
-        db.create_table()  # Ensure the table exists
+        await db.async_create_pool()  # Create the connection pool
+        await db.async_create_table()  # Ensure the table exists
+        
 
         # Get list of URLs to crawl
         url_list = load_tranco_list()
@@ -200,23 +203,14 @@ def main():
         scraper = setup_scraper(SCRAPER_CONFIG, db)
 
         # Run Kafka-integrated scraper
-        asyncio.run(
-            run_kafka_scraper(producer, consumer, scraper, url_list, KAFKA_CONFIG)
-        )
+        await run_kafka_scraper(producer, consumer, scraper, url_list, KAFKA_CONFIG)
     except KeyboardInterrupt:
         logger.info("Process interrupted by user. Shutting down gracefully...")
     except Exception as e:
         logger.error(f"Unexpected error in main: {e}", exc_info=True)
     finally:
-        # Cleanup
-        if "producer" in locals():
-            producer.close()
-        if "consumer" in locals():
-            consumer.close()
-        if "db" in locals():
-            db.close()
-        logger.info("Kafka scraper shutdown complete.")
+        await cleanup(producer, consumer, db)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

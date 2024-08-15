@@ -1,12 +1,12 @@
 from utils import logger
-from confluent_kafka import Producer, Consumer
-from confluent_kafka.admin import AdminClient, NewTopic, KafkaException, KafkaError
+from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
+from confluent_kafka.admin import AdminClient, NewTopic
 from typing import Dict, Any, Optional
 import json
 import time
 import socket
 import logging
-
+import asyncio
 
 class KafkaLogHandler(logging.Handler):
     def emit(self, record):
@@ -25,18 +25,12 @@ class KafkaLogHandler(logging.Handler):
             # Handle regular messages
             logger.info(f"Kafka: {msg}")
 
-
 kafka_log_handler = KafkaLogHandler()
 kafka_log_handler.setFormatter(logging.Formatter("%(message)s"))
 
 
 class KafkaAdmin:
     def __init__(self, bootstrap_servers: str = "localhost:9092"):
-        """
-        Initialize the Kafka admin client.
-
-        :param bootstrap_servers: A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster
-        """
         self.bootstrap_servers = bootstrap_servers
         self.admin_client = AdminClient(
             {
@@ -50,14 +44,6 @@ class KafkaAdmin:
     def create_topic(
         self, topic_name: str, num_partitions: int = 1, replication_factor: int = 1
     ) -> None:
-        """
-        Create a new Kafka topic.
-
-        :param topic_name: Name of the topic to create
-        :param num_partitions: Number of partitions for the topic
-        :param replication_factor: Replication factor for the topic
-        :return: None
-        """
         topic = NewTopic(
             topic_name,
             num_partitions=num_partitions,
@@ -72,14 +58,14 @@ class KafkaAdmin:
             except Exception as e:
                 logger.error(f"Failed to create topic {topic}: {e}")
 
-    def delete_topic(self, topic_name: str, timeout: float = 30.0) -> None:
-        """
-        Delete a Kafka topic.
+    async def async_create_topic(
+        self, topic_name: str, num_partitions: int = 1, replication_factor: int = 1
+    ) -> None:
+        await asyncio.get_running_loop().run_in_executor(
+            None, self.create_topic, topic_name, num_partitions, replication_factor
+        )
 
-        :param topic_name: Name of the topic to delete
-        :param timeout: Operation timeout in seconds (default: 30.0)
-        :return: None
-        """
+    def delete_topic(self, topic_name: str, timeout: float = 30.0) -> None:
         try:
             fs = self.admin_client.delete_topics(
                 [topic_name], operation_timeout=timeout
@@ -96,14 +82,12 @@ class KafkaAdmin:
                 f"An error occurred while trying to delete topic '{topic_name}': {e}"
             )
 
-    def topic_exists(self, topic_name: str) -> bool:
-        """
-        Check if a topic exists in the Kafka cluster.
+    async def async_delete_topic(self, topic_name: str, timeout: float = 30.0) -> None:
+        await asyncio.get_running_loop().run_in_executor(
+            None, self.delete_topic, topic_name, timeout
+        )
 
-        :param admin_client: AdminClient instance
-        :param topic_name: Name of the topic to check
-        :return: True if the topic exists, False otherwise
-        """
+    def topic_exists(self, topic_name: str) -> bool:
         try:
             topics = self.admin_client.list_topics(timeout=5)
             return topic_name in topics.topics
@@ -111,25 +95,21 @@ class KafkaAdmin:
             logger.error(f"Failed to check topic existence: {e}")
             return False
 
+    async def async_topic_exists(self, topic_name: str) -> bool:
+        return await asyncio.get_running_loop().run_in_executor(
+            None, self.topic_exists, topic_name
+        )
+
     def check_broker_availability(
         self, max_retries: int = 5, retry_delay: float = 2.0
     ) -> bool:
-        """
-        Check if the Kafka broker is available with retries.
-
-        :param max_retries: Maximum number of connection attempts
-        :param retry_delay: Delay between retries in seconds
-        :return: True if the broker is available, False otherwise
-        """
         for attempt in range(max_retries):
             try:
-                # First, try a simple socket connection
                 host, port = self.bootstrap_servers.split(":")
                 with socket.create_connection((host, int(port)), timeout=10):
                     pass
 
-                # If socket connection succeeds, try listing topics
-                cluster_metadata = self.admin_client.list_topics(timeout=10.0)
+                self.admin_client.list_topics(timeout=10.0)
                 logger.info("Successfully connected to Kafka broker")
                 return True
             except (socket.error, KafkaException) as e:
@@ -140,6 +120,13 @@ class KafkaAdmin:
                     time.sleep(retry_delay)
         logger.error(f"Failed to connect to Kafka broker after {max_retries} attempts")
         return False
+
+    async def async_check_broker_availability(
+        self, max_retries: int = 5, retry_delay: float = 2.0
+    ) -> bool:
+        return await asyncio.get_running_loop().run_in_executor(
+            None, self.check_broker_availability, max_retries, retry_delay
+        )
 
 
 class KafkaProducer:
@@ -162,14 +149,6 @@ class KafkaProducer:
         )
 
     def produce(self, topic: str, value: Any, key: Optional[str] = None) -> None:
-        """
-        Produce a message to a Kafka topic.
-
-        :param topic: The topic to produce the message to
-        :param value: The value of the message to be sent
-        :param key: The key of the message (optional)
-        :return: None
-        """
         try:
             self.producer.produce(
                 topic,
@@ -180,26 +159,29 @@ class KafkaProducer:
         except Exception as e:
             logger.error(f"Error producing message: {e}")
 
+    async def async_produce(self, topic: str, value: Any, key: Optional[str] = None) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.produce, topic, value, key)
+
+    def flush(self, timeout: Optional[float] = None) -> int:
+        return self.producer.flush(timeout if timeout is not None else -1)
+
+    async def async_flush(self, timeout: Optional[float] = None) -> int:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.flush, timeout)
+
     def close(self):
-        """
-        Close the producer connection.
-        """
         self.producer.flush()
+        self.producer.close()
+
+    async def async_close(self):
+        await self.async_flush()
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.producer.close)
 
 
 class KafkaConsumer:
     def __init__(self, config):
-        """
-        Initialize the Kafka consumer.
-
-        :param bootstrap_servers: A comma-separated list of host and port pairs that are the addresses of the Kafka brokers
-        :param group_id: An identifier for the consumer group this consumer belongs to
-        :param auto_offset_reset: Where to start reading messages when no offset is stored
-        :param enable_auto_commit: Whether to automatically commit offsets
-        :param max_poll_interval_ms: Maximum delay between invocations of poll()
-        :param session_timeout_ms: Timeout used to detect consumer failures
-        :param socket_timeout_ms: Timeout for network requests
-        """
         self.consumer = Consumer({
             "bootstrap.servers": config["bootstrap_servers"],
             "group.id": config["group_id"],
@@ -212,23 +194,15 @@ class KafkaConsumer:
         self.subscribed = False
 
     def subscribe(self, topic: str) -> None:
-        """
-        Subscribe to a Kafka topic.
-
-        :param topic: The name of the topic to subscribe to
-        :return: None
-        """
         self.consumer.subscribe([topic])
-        self.subscribed = True  # Set the subscribed flag to True
+        self.subscribed = True
         logger.info(f"Subscribed to topic: {topic}")
 
-    def poll(self, timeout: float = 1.0) -> Dict[str, Any]:
-        """
-        Poll the consumer for messages.
+    async def async_subscribe(self, topic: str) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.subscribe, topic)
 
-        :param timeout: The maximum time to block waiting for a message
-        :return: A dictionary containing the message details, or None if no message is available
-        """
+    def poll(self, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
         if not self.subscribed:
             raise RuntimeError("Consumer is not subscribed to any topics")
 
@@ -243,6 +217,7 @@ class KafkaConsumer:
             else:
                 logger.error(f"Error while polling: {msg.error()}")
             return None
+
         return {
             "topic": msg.topic(),
             "partition": msg.partition(),
@@ -251,14 +226,20 @@ class KafkaConsumer:
             "value": msg.value().decode("utf-8"),
         }
 
+    async def async_poll(self, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.poll, timeout)
+
     def close(self):
-        """
-        Close the consumer connection.
-        """
         self.consumer.close()
 
+    async def async_close(self):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.close)
+
     def commit(self):
-        """
-        Commit current offsets for all assigned partitions.
-        """
         self.consumer.commit()
+
+    async def async_commit(self):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.commit)
