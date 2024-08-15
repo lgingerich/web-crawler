@@ -7,7 +7,6 @@ from kafka_utils import KafkaAdmin, KafkaProducer, KafkaConsumer
 from scraper import Scraper
 from database import DatabaseManager
 from utils import logger, fetch_tranco_list
-from confluent_kafka import KafkaError
 
 # Load configuration from config.yaml
 with open("config.yaml", "r") as config_file:
@@ -17,6 +16,7 @@ with open("config.yaml", "r") as config_file:
 KAFKA_CONFIG = config["kafka"]
 SCRAPER_CONFIG = config["scraper"]
 DB_CONFIG = config["database"]
+TRANCO_CONFIG = config["tranco"]
 
 
 async def setup_kafka(config):
@@ -45,28 +45,25 @@ def setup_scraper(scraper_config, db):
     return Scraper(**scraper_config, db=db)
 
 
-def load_tranco_list(
-    list_date: str = "2024-01-01", top_n: int = 10000, cache_dir: str = "url_data"
-):
+def load_tranco_list(tranco_config: dict):
     """
     Load the Tranco list from local cache or download if not available.
-
-    :param list_date: Date of the list to fetch ('latest' or YYYY-MM-DD format)
-    :param top_n: Number of top domains to fetch
-    :param cache_dir: Directory to save/load the Tranco list
+    
+    :param tranco_config: Dictionary containing Tranco configuration (list_date, top_n, cache_dir)
     :return: List of domain names
     """
-    file_name = f"tranco_top_{top_n}_{list_date}.txt"
-    file_path = os.path.join(cache_dir, file_name)
+    list_date = tranco_config.get("list_date")
+    top_n = tranco_config.get("top_n")
+    cache_dir = tranco_config.get("cache_dir")
+
+    file_path = os.path.join(cache_dir, f"tranco_top_{top_n}_{list_date}.txt")
 
     if not os.path.exists(file_path):
-        logger.info("Tranco list not found locally. Downloading...")
         file_path = fetch_tranco_list(list_date, top_n, cache_dir)
+    
+    with open(file_path, "r") as file:
+        return [line.strip() for line in file.readlines()]
 
-    with open(file_path, "r") as f:
-        domains = [line.strip() for line in f]
-
-    return domains
 
 
 async def process_url(scraper, url):
@@ -195,8 +192,8 @@ async def main():
         await db.async_create_table()  # Ensure the table exists
         
 
-        # Get list of URLs to crawl
-        url_list = load_tranco_list()
+        # Get list of URLs to crawl with Tranco configuration
+        url_list = load_tranco_list(TRANCO_CONFIG)
         print(f"Loaded {len(url_list)} domains from Tranco list")
 
         # Scraper Setup

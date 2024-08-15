@@ -19,3 +19,9 @@ database:
   password: "password"
   host: "localhost"
   port: 5432
+
+# Url data
+tranco:
+  list_date: "2024-01-01"
+  top_n: 10000
+  cache_dir: "url_data"
