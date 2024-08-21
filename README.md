@@ -92,12 +92,15 @@ maybe not all url html data getting downloaded
 
 
 
+scraping/playwright optimizations:
+    - Block unnecessary resources to speed up page loads
 
 
+batch inserts for metadata?
 
 kafka improvements
 
     batch send url's to kafka
         do it time based
 
-    
+    implement multiple consumers / multiple partitionsß
