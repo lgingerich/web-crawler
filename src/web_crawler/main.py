@@ -7,9 +7,6 @@ from kafka_utils import KafkaAdmin, KafkaProducer, KafkaConsumer
 from scraper import Scraper
 from database import DatabaseManager
 from utils import logger, fetch_tranco_list
-# from line_profiler import profile
-# from scalene import profile
-from scalene import scalene_profiler
 
 # Load configuration from config.yaml
 with open("config.yaml", "r") as config_file:
@@ -21,7 +18,6 @@ SCRAPER_CONFIG = config["scraper"]
 DB_CONFIG = config["database"]
 TRANCO_CONFIG = config["tranco"]
 
-# @profile
 async def setup_kafka(config):
     # Setup Kafka clients
     kafka_admin = KafkaAdmin(config["bootstrap_servers"])
@@ -44,11 +40,9 @@ async def setup_kafka(config):
 
     return kafka_admin, producer, consumer
 
-# @profile
 def setup_scraper(scraper_config, db):
     return Scraper(**scraper_config, db=db)
 
-# @profile
 def load_tranco_list(tranco_config: dict):
     """
     Load the Tranco list from local cache or download if not available.
@@ -68,7 +62,6 @@ def load_tranco_list(tranco_config: dict):
     with open(file_path, "r") as file:
         return [line.strip() for line in file.readlines()]
 
-# @profile
 async def process_url(scraper, url):
     parsed_url = urlparse(url)
     filename = f"{parsed_url.netloc.replace('.', '_')}.html"
@@ -111,7 +104,6 @@ async def process_url(scraper, url):
 
     logger.info(f"Finished processing {url}")
 
-# @profile
 async def produce_urls(producer, topic, urls):
     try:
         for url in urls:
@@ -125,7 +117,6 @@ async def produce_urls(producer, topic, urls):
         logger.error(f"Error in produce_urls: {e}")
         raise
 
-# @profile
 async def consume_and_process(consumer, scraper, topic):
     await consumer.async_subscribe(topic)
     
@@ -143,7 +134,6 @@ async def consume_and_process(consumer, scraper, topic):
     finally:
         await consumer.async_close()
 
-# @profile
 async def run_kafka_scraper(producer, consumer, scraper, urls, kafka_config):
     try:
         producer_task = asyncio.create_task(
@@ -171,7 +161,6 @@ async def run_kafka_scraper(producer, consumer, scraper, urls, kafka_config):
         await producer.async_close()
         await consumer.async_close()
 
-# @profile
 async def cleanup(producer, consumer, db):
     if producer:
         await producer.async_close()
@@ -181,7 +170,6 @@ async def cleanup(producer, consumer, db):
         await db.async_close()
     logger.info("Web crawler shutdown complete.")
 
-# @profile
 async def main():
     try:
 
@@ -203,8 +191,14 @@ async def main():
         # Scraper Setup
         scraper = setup_scraper(SCRAPER_CONFIG, db)
 
-        # Run Kafka-integrated scraper
-        await run_kafka_scraper(producer, consumer, scraper, url_list, KAFKA_CONFIG)
+        # Run Kafka-integrated scraper for max 60 seconds
+        try:
+            await asyncio.wait_for(
+                run_kafka_scraper(producer, consumer, scraper, url_list, KAFKA_CONFIG),
+                timeout=60.0
+            )
+        except asyncio.TimeoutError:
+            logger.info("Execution stopped after 60 seconds")
     except KeyboardInterrupt:
         logger.info("Process interrupted by user. Shutting down gracefully...")
     except Exception as e:

@@ -79,9 +79,12 @@ class DatabaseManager:
                 existing_data = await self.async_get_record(url)
 
                 if existing_data:
+                    # Ensure existing_data["data"] is a dictionary
+                    existing_data_json = json.loads(existing_data["data"]) if isinstance(existing_data["data"], str) else existing_data["data"]
+                    
                     # Update existing record
-                    data["first_crawl_time"] = existing_data["data"]["first_crawl_time"]
-                    data["crawl_count"] = existing_data["data"].get("crawl_count", 0) + 1
+                    data["first_crawl_time"] = existing_data_json.get("first_crawl_time", data["last_crawl_time"])
+                    data["crawl_count"] = existing_data_json.get("crawl_count", 0) + 1
                 else:
                     # New record
                     data["first_crawl_time"] = data["last_crawl_time"]

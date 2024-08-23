@@ -172,12 +172,12 @@ class KafkaProducer:
 
     def close(self):
         self.producer.flush()
-        self.producer.close()
+        # self.producer.close()
 
     async def async_close(self):
         await self.async_flush()
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.producer.close)
+        await loop.run_in_executor(None, self.close)
 
 
 class KafkaConsumer:
